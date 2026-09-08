@@ -3,18 +3,13 @@ on:
   workflow_dispatch:
     inputs:
       keywords:
-        description: "JSON array"
+        description: 'JSON array'
         required: true
         type: string
   push:
     branches: [main]
     paths:
       - "trigger.json"
-    inputs:
-      keywords:
-        description: 'JSON array of contact keywords'
-        required: true
-        type: string
 jobs:
   hunt:
     runs-on: ubuntu-latest
@@ -26,8 +21,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwoff1 libopus0 libwebp6 libwebpdemux2 libenchant-2-2 libgudev-1.0-0 libsecret-1-0 libhyphen0 libgdk-pixbuf2.0-0 libegl1 libgles2 libevent-2.1-7
       - run: pip install ddddocr playwright requests
-      - run: python -m playwright install chromium --with-deps
+      - name: Install browser
+        run: |
+          python -m playwright install chromium
+          python -m playwright install-deps chromium
       - name: Hunt
         env:
           KEYWORDS: ${{ inputs.keywords }}
@@ -37,5 +39,5 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: results-shard-${{ matrix.shard }}
+          name: results-${{ matrix.shard }}
           path: hits.jsonl
