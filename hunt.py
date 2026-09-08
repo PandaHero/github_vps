@@ -66,7 +66,11 @@ async def main():
         ctx = await browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/126.0.0.0 Safari/537.36")
         page = await ctx.new_page()
         for kw in my:
-            result = await try_query(page, kw)
+            try:
+                result = await try_query(page, kw)
+            except Exception as e:
+                print(f"query error: {e}", flush=True)
+                result = None
             if result.get("status") == "OK" and result.get("rows"):
                 hits += 1
                 print(f"[HIT] {kw}: {result['rows'][:200]}", flush=True)
