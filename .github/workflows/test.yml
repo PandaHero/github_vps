@@ -1,6 +1,5 @@
 name: Test
-on:
-  workflow_dispatch:
+on: push
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -11,7 +10,11 @@ jobs:
           python-version: '3.11'
       - name: Install deps
         run: |
-          pip install ddddocr playwright requests opencv-python-headless
+          pip install ddddocr opencv-python-headless playwright requests
           python -c "import ddddocr; print('ddddocr OK')"
           python -m playwright install chromium --with-deps
           python -c "from playwright.async_api import async_playwright; print('playwright OK')"
+      - name: Test hunt
+        run: |
+          echo '["test","test@qq.com","123456","123456@qq.com"]' > trigger.json
+          python hunt.py || true
