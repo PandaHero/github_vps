@@ -15,29 +15,42 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+        shard: [0, 1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install system deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwoff1 libopus0 libwebp6 libwebpdemux2 libenchant-2-2 libgudev-1.0-0 libsecret-1-0 libhyphen0 libgdk-pixbuf2.0-0 libegl1 libgles2 libevent-2.1-7
+      - name: Cache playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium
       - run: pip install ddddocr playwright requests
-      - name: Install browser
+      - run: python -m playwright install --with-deps chromium
+      - name: Debug info
         run: |
-          python -m playwright install chromium
-          python -m playwright install-deps chromium
+          python -c "import ddddocr; print('ddddocr OK')"
+          python -c "from playwright.sync_api import sync_playwright; print('playwright OK')"
       - name: Hunt
         env:
           KEYWORDS: ${{ inputs.keywords }}
           SHARD: ${{ matrix.shard }}
-        run: python hunt.py
+        run: python hunt.py 2>&1 || true
       - name: Save results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: results-${{ matrix.shard }}
-          path: hits.jsonl
+          path: |
+            hits.jsonl
+            *.log
+      - name: Debug on failure
+        if: failure()
+        run: |
+          echo "=== Python version ==="
+          python --version
+          echo "=== pip list ==="
+          pip list
+          echo "=== last lines of hunt output ==="
+          true
