@@ -3,6 +3,15 @@ on:
   workflow_dispatch:
     inputs:
       keywords:
+        description: "JSON array"
+        required: true
+        type: string
+  push:
+    branches: [main]
+    paths:
+      - "trigger.json"
+    inputs:
+      keywords:
         description: 'JSON array of contact keywords'
         required: true
         type: string

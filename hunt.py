@@ -40,7 +40,10 @@ async def try_query(page, kw):
         return None
 
 async def main():
-    keywords = json.loads(os.environ.get("KEYWORDS", "[]"))
+    if os.path.exists('trigger.json'):
+    keywords = json.loads(open('trigger.json').read())
+else:
+    keywords = json.loads(os.environ.get('KEYWORDS', '[]'))
     shard = int(os.environ.get("SHARD", "0"))
     total = 20
     my = [k for i, k in enumerate(keywords) if i % total == shard]
