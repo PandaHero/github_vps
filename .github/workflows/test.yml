@@ -1,0 +1,17 @@
+name: Test
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: |
+          pip install ddddocr playwright requests opencv-python-headless
+          python -c "import ddddocr; print('ddddocr OK')"
+          python -m playwright install chromium --with-deps
+          python -c "from playwright.async_api import async_playwright; print('playwright OK')"
