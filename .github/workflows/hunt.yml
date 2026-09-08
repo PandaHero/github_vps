@@ -1,0 +1,32 @@
+name: Hunter
+on:
+  workflow_dispatch:
+    inputs:
+      keywords:
+        description: 'JSON array of contact keywords'
+        required: true
+        type: string
+jobs:
+  hunt:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install ddddocr playwright requests
+      - run: python -m playwright install chromium --with-deps
+      - name: Hunt
+        env:
+          KEYWORDS: ${{ inputs.keywords }}
+          SHARD: ${{ matrix.shard }}
+        run: python hunt.py
+      - name: Save results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-shard-${{ matrix.shard }}
+          path: hits.jsonl
