@@ -1,0 +1,98 @@
+name: Card Extractor
+on:
+  workflow_dispatch:
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        batch: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install playwright
+      - run: python -m playwright install chromium --with-deps
+      - name: Extract cards
+        env:
+          BATCH: ${{ matrix.batch }}
+        run: |
+          python - <<'HEREDOC'
+          import asyncio, json, os, re, time, random, sys
+          from playwright.async_api import async_playwright
+
+          BASE = "https://wzyp.cn"
+          KW = "123456@qq.com"
+          
+          free_orders = json.load(open("free_orders.json", encoding="utf-8"))
+          batch = int(os.environ.get("BATCH", "0"))
+          chunk_size = len(free_orders) // 20 + 1
+          my_orders = free_orders[batch * chunk_size : (batch + 1) * chunk_size]
+          print(f"Batch {batch}: {len(my_orders)} orders")
+          
+          async def main():
+              results = []
+              async with async_playwright() as p:
+                  browser = await p.chromium.launch(headless=True, args=["--no-sandbox"])
+                  ctx = await browser.new_context(
+                      user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+                      locale="zh-CN")
+                  page = await ctx.new_page()
+                  
+                  # 建立会话
+                  await page.goto(f"{BASE}/order", wait_until="domcontentloaded", timeout=30000)
+                  await page.wait_for_timeout(3000)
+                  inp = await page.query_selector("input[placeholder*='预留联系方式']")
+                  if inp:
+                      await inp.fill(KW)
+                      btn = await page.query_selector("button:has-text('查询订单')")
+                      if btn:
+                          await btn.click()
+                          await page.wait_for_timeout(3000)
+                  
+                  for i, o in enumerate(my_orders):
+                      tno = o["trade_no"]
+                      goods = o.get("goods_name", "")[:40]
+                      try:
+                          await page.goto(f"{BASE}/order/result/{tno}", wait_until="domcontentloaded", timeout=25000)
+                          await page.wait_for_timeout(3000)
+                          txt = await page.evaluate("() => document.body.innerText")
+                          
+                          if "访问受限" in txt or "高风险" in txt:
+                              print(f"[{i}] {tno} BLOCKED", flush=True)
+                              break
+                          
+                          card_match = re.search(r"您购买的卡密\s*(\d+)\s*张,已发货\s*(\d+)\s*张", txt)
+                          if card_match:
+                              cards = re.findall(r"第\d+张\s*
+复制\s*
+([^
+]+)", txt)
+                              result = {"trade_no": tno, "goods": goods, "cards": cards}
+                              results.append(result)
+                              with open("cards_result.jsonl", "a", encoding="utf-8") as f:
+                                  f.write(json.dumps(result, ensure_ascii=False) + "
+")
+                              print(f"[{i}] OK {tno} | {goods[:30]} | {cards[0][:60] if cards else ''}", flush=True)
+                          elif "安全密码" in txt:
+                              print(f"[{i}] {tno} | 需密码", flush=True)
+                          else:
+                              print(f"[{i}] {tno} | {txt[:80]}", flush=True)
+                          
+                          await asyncio.sleep(random.uniform(1, 3))
+                      except Exception as e:
+                          print(f"[{i}] {tno} ERR: {str(e)[:50]}", flush=True)
+                  
+                  await browser.close()
+              print(f"Done: {len(results)} extracted", flush=True)
+          
+          import re
+          asyncio.run(main())
+          HEREDOC
+      - name: Save cards
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cards-batch-${{ matrix.batch }}
+          path: cards_result.jsonl
